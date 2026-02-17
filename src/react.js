@@ -66,20 +66,62 @@ function workLoop(deadline) {
   // 4. 다음 유휴 시간에 이 함수가 다시 실행되도록 requestIdleCallback 예약
 }
 
+// const newFiber = {
+//   type: element.type,
+//   props: element.props,
+//   dom: null,
+//   parent: fiber,    // 부모 누구?
+//   child: null,      // 첫째 자식 누구?
+//   sibling: null,    // 내 동생 누구?
+// };
 // 역할: Fiber 하나를 처리하고, "다음 처리할 Fiber"를 반환하는 함수
 function performUnitOfWork(fiber) {
   // 1. DOM 생성: 만약 fiber.dom이 없다면 createDom(fiber)로 만들어서 fiber.dom에 저장
-  //    (주의: 여기서 appendChild로 부모에 붙이지 마세요! 그건 commit 단계에서 합니다.)
+  if(!fiber.dom)
+    fiber.dom = createDom(fiber)
 
   // 2. 자식들(fiber.props.children)을 Fiber로 변환 (Reconciliation)
-  //    - 자식 배열을 돌면서 새로운 Fiber 객체를 만듭니다.
-  //    - 부모(parent), 자식(child), 형제(sibling) 관계를 연결해줍니다.
-  //    - 첫 번째 자식은 fiber.child로, 나머지는 이전 형제의 sibling으로 연결!
+  const elements = fiber.props.children;
+  let index = 0;
+  let prevSibling = null // "방금 만든 형제"를 기억할 변수
+
+  while(index < elements.length){
+    const element = elements[index]
+
+    const newFiber = {
+      type : element.type,
+      props : element.props,
+      dom : null,
+      parent : fiber
+    }
+
+    if(index == 0){
+      fiber.child = newFiber
+    }else{
+      prevSibling.sibling = newFiber
+    }
+
+    prevSibling = newFiber
+    index++
+  }
 
   // 3. 다음 작업 단위(Fiber) 반환 (탐색 순서 중요!)
   //    - 1순위: 자식이 있으면 자식 반환
+  if(fiber.child){
+    return fiber.child;
+  }
   //    - 2순위: 자식이 없으면 형제(sibling) 반환
-  //    - 3순위: 형제도 없으면 부모의 형제(삼촌)를 찾을 때까지 위로 올라감(parent)
+  let nextFiber = fiber;
+  
+  while (nextFiber) {
+    if (nextFiber.sibling) {
+      return nextFiber.sibling;
+    }
+    //3순위: 형제도 없으면? 부모님 댁으로 올라갑니다. (올라가기)
+    // 부모님한테 가서 "아빠 형제(삼촌) 있어요?" 라고 물어보기 위해 루프를 돕니다.
+    nextFiber = nextFiber.parent
+  }
+
 }
 
 // 역할: 작업이 다 끝난 트리(wipRoot)를 실제 DOM에 한 번에 붙여주는 역할
